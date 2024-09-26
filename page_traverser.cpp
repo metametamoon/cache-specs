@@ -136,7 +136,7 @@ double check_tag_index(i64 tag_try) {
  *  When `assoc_try > real_assoc`, we are hitting the same cache set in the loop more times than there are
  *  entries in a cache set, thus causing the writeback to negatively impact the performance
  */
-double check_assoc(i64 assoc_try) {
+double check_assoc(i64 assoc_try, i64 first_tag_index) {
   auto unalignedHeap = zero_alloc(64 * (1 << 21) + 4096);
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
@@ -144,7 +144,7 @@ double check_assoc(i64 assoc_try) {
   std::vector<double> results;
 
   clear_memory();
-  int tag = 1 << 21;
+  int tag = 1 << first_tag_index;
 
   int portion = 4096 / assoc_try;
   for (i64 nTry = 0; nTry < nTries; nTry++) {
