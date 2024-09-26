@@ -124,7 +124,7 @@ double check_assoc(i64 assoc_try) {
   auto unalignedHeap = static_cast<u8 *>(calloc(64 * (1 << 21) + 4096, 1));
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
-  int nTries = 100000;
+  int nTries = 500000;
   std::vector<double> results;
 
   clear_memory();

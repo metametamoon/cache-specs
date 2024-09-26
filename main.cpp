@@ -58,8 +58,9 @@ void find_assoc() {
     for (int maybeAssoc = 8; maybeAssoc <= 16; ++maybeAssoc) {
         double next = check_assoc(maybeAssoc);
         // std::cout << "maybeAssoc=" << maybeAssoc << " mean=" << next << std::endl;
-        if (next / prev >= 1.05) {
+        if (next / prev >= 1.04) {
             std::cout << "assessed associativity: " << maybeAssoc - 1 << std::endl;
+            break; // the performance will degrade further, we are only interested in the first spike
         }
         prev = next;
     }
@@ -67,10 +68,7 @@ void find_assoc() {
 
 int main() {
     bind_to_one_core();
-    find_cache_line_size();
-    find_first_tag_index();
+    // find_cache_line_size();
+    // find_first_tag_index();
     find_assoc();
-    // for (i64 i = 1; i <= 15; ++i) {
-        // find_assoc();
-    // }
 }
