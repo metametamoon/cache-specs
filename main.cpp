@@ -43,7 +43,7 @@ i64 find_first_tag_index(i64 cacheline_size) {
         int tagStep = 1 << maybeTag;
         double next = check_tag_index(tagStep);
         // std::cout << "maybeTag=" << maybeTag << " mean=" << next << std::endl;
-        if (prev * 2 < next) {
+        if (prev * 1.3 < next) {
             std::cout << "assessed first tag index: " << maybeTag << std::endl;
             return maybeTag;
         }

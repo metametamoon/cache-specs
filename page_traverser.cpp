@@ -140,7 +140,7 @@ double check_assoc(i64 assoc_try, i64 first_tag_index) {
   auto unalignedHeap = zero_alloc(64 * (1 << 21) + 4096);
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
-  int nTries = 500000;
+  int nTries = 1000000;
   std::vector<double> results;
 
   clear_memory();
