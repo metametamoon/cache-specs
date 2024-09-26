@@ -62,6 +62,11 @@ double traverse_pages(i64 step, i64 repNum) {
     clear_memory();
     activate_pages(pageCount, pageSize, heap);
 
+    /*
+     * If step is greater than the size of the cache line, each (a simplification) iteration of the loop
+     * will result in a cache miss, degrading the performance. The experiments showed that the performance
+     * is being halved in such cases.
+     */
     auto const start = std::chrono::high_resolution_clock::now();
     for (i64 i = 0; i < pageCount; i++) {
       u8 value = heap[pageSize * i + step];
@@ -77,7 +82,19 @@ double traverse_pages(i64 step, i64 repNum) {
   return robust_mean(results);
 }
 
-double check_index_tag(i64 tag_try) {
+/*
+ * The idea is as follows:
+ * we are going reading-writing at address `heap + tag_try * i` for i in [0..1024).
+ * If `tag_try` is an index that points to an index field of the address,
+ * we will hit a new cache set most of the times, thus, the need to write-back during
+ * the overflow of cache will be escaped.
+ * If, however, `tag_try` is actually an index pointing into the tag section of the address,
+ * at each iteration we will try to access new cache line with trying to put it into the same cache set,
+ * thus causing the writeback to some cache line from the cache set, causing additional overhead.
+ * The experiments show that this overhead causes the resulting time of the operation to be at least twice
+ * as large as the cost without the overhead.
+ */
+double check_tag_index(i64 tag_try) {
   auto unalignedHeap = static_cast<u8 *>(calloc(tag_try * 1024 + 4096, 1));
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
@@ -98,6 +115,11 @@ double check_index_tag(i64 tag_try) {
   return robust_mean(results);
 }
 
+/*
+ *  We will to access addresses `heap + i * (1 << first_tag_index)` for i in [0..assoc_try) in the loop.
+ *  When `assoc_try > real_assoc`, we are hitting the same cache set in the loop more times than there are
+ *  entries in a cache set, thus causing the writeback to negatively impact the performance
+ */
 double check_assoc(i64 assoc_try) {
   auto unalignedHeap = static_cast<u8 *>(calloc(64 * (1 << 21) + 4096, 1));
   auto heap = create_aligned_heap(unalignedHeap);
@@ -113,7 +135,6 @@ double check_assoc(i64 assoc_try) {
     auto start = std::chrono::high_resolution_clock::now();
     for (i64 p = 0; p < portion; p++) {
       for (i64 i = 0; i < assoc_try; i++) {
-        i64 step_index = 1 << 6; // we know it from the experiment above
         i64 baseIndex = 0;
         heap[baseIndex + tag * i] = heap[baseIndex + tag * i] + 1;
       }
