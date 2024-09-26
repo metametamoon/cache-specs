@@ -7,12 +7,27 @@
 #include "page_traverser.h"
 
 #include <assert.h>
+#include <source_location>
 
 
-// do not discard a value
+u8* zero_alloc(i64 size, const std::source_location location = std::source_location::current()) {
+  auto x = calloc(size, 1);
+  if (x == nullptr) {
+    printf("zero_alloc failed\n");
+    std::cout << "file: "
+        << location.file_name() << '('
+        << location.line() << ':'
+        << location.column() << ") `"
+        << location.function_name()
+          << " tried allocating (bytes):" << size <<  std::endl;
+    exit(-1);
+  }
+  return static_cast<u8 *>(x);
+}
+
 u8 clear_memory() {
   i64 mb = 16;
-  auto x = calloc(mb << 20, sizeof(u8));
+  auto x = zero_alloc(mb << 20);
   assert(x);
   free(x);
   return 0;
@@ -56,7 +71,7 @@ double traverse_pages(i64 step, i64 repNum) {
   u8 sum = 0;
   for (i64 rep = 0; rep < repNum; ++rep) {
     clear_memory();
-    u8* unalignedHeap = (u8*)calloc(alloca_size, 1);
+    u8* unalignedHeap = zero_alloc(alloca_size);
     u8* heap = create_aligned_heap(unalignedHeap);
 
     clear_memory();
@@ -95,7 +110,7 @@ double traverse_pages(i64 step, i64 repNum) {
  * as large as the cost without the overhead.
  */
 double check_tag_index(i64 tag_try) {
-  auto unalignedHeap = static_cast<u8 *>(calloc(tag_try * 1024 + 4096, 1));
+  auto unalignedHeap = zero_alloc(tag_try * 1024 + 4096);
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
   int nTries = 500000;
@@ -112,6 +127,7 @@ double check_tag_index(i64 tag_try) {
     auto diff = static_cast<double>((end - start).count());
     results.push_back(diff);
   }
+  free(unalignedHeap);
   return robust_mean(results);
 }
 
@@ -121,7 +137,7 @@ double check_tag_index(i64 tag_try) {
  *  entries in a cache set, thus causing the writeback to negatively impact the performance
  */
 double check_assoc(i64 assoc_try) {
-  auto unalignedHeap = static_cast<u8 *>(calloc(64 * (1 << 21) + 4096, 1));
+  auto unalignedHeap = zero_alloc(64 * (1 << 21) + 4096);
   auto heap = create_aligned_heap(unalignedHeap);
   clear_memory();
   int nTries = 500000;
