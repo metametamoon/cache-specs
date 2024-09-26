@@ -68,7 +68,7 @@ void find_assoc() {
 
 int main() {
     bind_to_one_core();
-    // find_cache_line_size();
-    // find_first_tag_index();
+    find_cache_line_size();
+    find_first_tag_index();
     find_assoc();
 }
