@@ -27,7 +27,9 @@ i64 find_cache_line_size() {
     double prev = 100.0;
     for (int i = 1; i < 4096; i = i << 1) {
         double next = traverse_pages(i, 1000);
-        // std::cout << "step=" << i << " mean=" << next << std::endl;
+#ifdef VERBOSE
+        std::cout << "step=" << i << " mean=" << next << std::endl;
+#endif
         if (next > prev * 1.75) {
             std::cout << "assessed cache line size: " << i << std::endl;
             return i;
@@ -42,7 +44,9 @@ i64 find_first_tag_index(i64 cacheline_size) {
     for (int maybeTag = 16; maybeTag <= 24; ++maybeTag) {
         int tagStep = 1 << maybeTag;
         double next = check_tag_index(tagStep);
-        // std::cout << "maybeTag=" << maybeTag << " mean=" << next << std::endl;
+#ifdef VERBOSE
+        std::cout << "maybeTag=" << maybeTag << " mean=" << next << std::endl;
+#endif
         if (prev * 1.3 < next) {
             std::cout << "assessed first tag index: " << maybeTag << std::endl;
             return maybeTag;
@@ -61,7 +65,9 @@ i64 find_assoc(i64 first_tag_index) {
     double prev = 1000000.;
     for (int maybeAssoc = 8; maybeAssoc <= 16; ++maybeAssoc) {
         double next = check_assoc(maybeAssoc, first_tag_index);
-        // std::cout << "maybeAssoc=" << maybeAssoc << " mean=" << next << std::endl;
+#ifdef VERBOSE
+        std::cout << "maybeAssoc=" << maybeAssoc << " mean=" << next << std::endl;
+#endif
         if (next / prev >= 1.04) {
             std::cout << "assessed associativity: " << maybeAssoc - 1 << std::endl;
             return maybeAssoc - 1; // the performance will degrade further, we are only interested in the first spike
