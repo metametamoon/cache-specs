@@ -79,20 +79,6 @@ i64 find_assoc(i64 first_tag_index) {
 
 int main() {
     bind_to_one_core();
-    // i64 cacheline_size = find_cache_line_size();
-    // if (cacheline_size < 0) {
-    //     std::cout << "Failed to calculate cache line size.\n";
-    //     return -1;
-    // }
-    // i64 first_tag_index = find_first_tag_index(cacheline_size);
-    // if (first_tag_index < 0) {
-    //     std::cout << "Failed to calculate first index pointing to tag in address.\n";
-    //     return -1;
-    // }
-    // i64 assoc = find_assoc(first_tag_index);
-    // if (assoc == -1) {
-    //     std::cout << "Failed to calculate associativity of the cache.\n";
-    // }
     i64 logPageSize = 12;
     for (i64 i = logPageSize + 1; i <= 18; i += 1) {
         auto start = std::chrono::high_resolution_clock::now();

@@ -191,9 +191,9 @@ double check_size(i64 logsize) {
     heap[step * i] = heap + step * nextI;
   }
   {
+    // setting up memory
     i64 n = N * 4;
     auto ptr = heap;
-#pragma unroll 128
     while (--n) {
       ptr = (void**)*ptr;
     }
@@ -203,6 +203,7 @@ double check_size(i64 logsize) {
   i64 n = N * repCount;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
+#pragma unroll 128
   while (--n) {
     ptr = (void**)*ptr;
   }
