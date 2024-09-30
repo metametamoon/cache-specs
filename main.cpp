@@ -95,7 +95,11 @@ int main() {
     // }
     i64 logPageSize = 12;
     for (i64 i = logPageSize + 1; i <= 18; i += 1) {
-        printf("size=%4ldKb time=%f\n", (1l << (i - 10)), check_size(i));
+        auto start = std::chrono::high_resolution_clock::now();
+        double measureTime = check_size(i);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
+        printf("size=%4ldKb time=%f (took %lds)\n", (1l << (i - 10)), measureTime, passedTime.count());
     }
     return 0;
 }

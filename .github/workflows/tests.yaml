@@ -13,6 +13,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - run: |
-          g++ main.cpp page_traverser.cpp -g -std=gnu++20 -DVERBOSE
+          g++ main.cpp page_traverser.cpp clear_memory.cpp -O3 -std=gnu++20 -DVERBOSE
           ./a.out
         name: Measure Cache stats
