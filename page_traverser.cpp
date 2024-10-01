@@ -154,3 +154,42 @@ double check_assoc(i64 maybeAssoc, i64 cacheline_size) {
   free(unalignedHeap);
   return diff;
 }
+
+double check_cacheline2(i64 maybeCacheline) {
+  void** unalignedHeap = (void**)calloc((1 << 27) + 4096, sizeof(void*));
+  void** heap = create_aligned_ptr(unalignedHeap);
+  i64 const bigStep = 1 << 18;
+  i64 const smallStep = maybeCacheline;
+  i64 smallStepBound = 2;
+  for (i64 i = 0; i < 128; ++i) {
+    for (int j = 0; j < smallStepBound; ++j) {
+      i64 nextJ = (j + 1) % smallStepBound;
+      i64 nextI = i;
+      if (nextJ == 0) {
+        nextI = (nextI + 1) % 128;
+      }
+      heap[bigStep * i + smallStep * j] = heap + bigStep * nextI + smallStep * nextJ;
+    }
+  }
+  { // seeting up the memory
+    i64 n = 1l << 23;
+    auto ptr = heap;
+    while (--n) {
+      ptr = (void**)*ptr;
+    }
+    fprintf(stdin, "%p", ptr);
+  }
+  constexpr i64 repCount = 1l << 29;
+  i64 n = repCount;
+  auto ptr = heap;
+  auto start = std::chrono::high_resolution_clock::now();
+#pragma unroll 1024
+  while (--n) {
+    ptr = (void**)*ptr;
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  fprintf(stdin, "%p", ptr);
+  auto diff = static_cast<double>((end - start).count()) / repCount;
+  free(unalignedHeap);
+  return diff;
+}

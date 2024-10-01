@@ -5,7 +5,7 @@
 
 
 u8* trash_cpu_caches() {
-    int mb = 16;
+    int mb = 1;
     auto x = calloc(mb << 20, 1);
     assert(x);
     return (u8*)x;

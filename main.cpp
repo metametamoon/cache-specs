@@ -17,23 +17,32 @@ void bind_to_one_core() {
     sched_setaffinity(pid, 1, &set);
 }
 
-#define VERBOSE
 
-i64 find_cacheline_size() {
-    double prev = 100.0;
-    for (int i = 1; i <= 256; i = i << 1) {
-        double next = traverse_pages(i, 4000);
-#ifdef VERBOSE
-        std::cout << "step=" << i << " mean=" << next << std::endl;
-#endif
-        if (next > prev * 1.75) {
-            std::cout << "assessed cache line size: " << i << std::endl;
-            // return i;
+i64 cacheline_eval_loop() {
+    // std::ofstream f("cachesize-to-time.txt");
+    double prev = 10000000000.0;
+    std::optional<i64> ansCacheline = std::nullopt;
+    for (i64 i = 8; i <= 256; i = i << 1) {
+        auto start = std::chrono::high_resolution_clock::now();
+        double measureTime = check_cacheline2(i / (sizeof(void**)));
+        auto end = std::chrono::high_resolution_clock::now();
+        auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
+        printf("cacheline=%3ldKb time=%f (took %lds)\n", i, measureTime, passedTime.count());
+        if (measureTime > prev) {
+            double relativeIncrease = (measureTime - prev) / prev;
+            if (relativeIncrease > 0.08 && !ansCacheline.has_value()) {
+                ansCacheline = i;
+            }
         }
-        prev = next;
+        prev = measureTime;
     }
-    printf("failed to find cacheline size\n");
-    return -1;
+    if (ansCacheline.has_value()) {
+        printf("evaluated cache size is %ldKb\n", ansCacheline.value());
+        return ansCacheline.value();
+    } else {
+        printf("failed to find cacheline size\n");
+        return -1;
+    }
 }
 
 
@@ -85,7 +94,7 @@ void associativity_eval_loop(i64 cacheline_size) {
 
 int main() {
     bind_to_one_core();
-    auto cacheline_size = find_cacheline_size();
+    auto cacheline_size = cacheline_eval_loop();
     if (cacheline_size == -1 ) {
         cacheline_size = 64;
         printf("continuing assuming cache line size is 64");
