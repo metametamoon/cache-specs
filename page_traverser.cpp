@@ -180,12 +180,12 @@ T* create_aligned_ptr(T* unalignedHeap) {
 
 
 // size must be a power of 2
-double check_size(i64 logsize) {
+double check_size(i64 size) {
   assert(logsize >= 13);
   void** unalignedHeap = (void**)calloc(1 << 22, sizeof(void*));
   void** heap = create_aligned_ptr(unalignedHeap);
   i64 const step = 1 << 6;
-  i64 N = (1 << logsize) / step; // >= 1 << 7
+  i64 N = size / step; // >= 1 << 7
   for (i64 i = 0; i < N; ++i) {
     i64 nextI = (i + 1) % N;
     heap[step * i] = heap + step * nextI;
@@ -199,8 +199,8 @@ double check_size(i64 logsize) {
     }
     fprintf(stdin, "%p", ptr);
   }
-  i64 repCount = 10'000'000;
-  i64 n = N * repCount;
+  i64 const loopIters = 1l << 33; // 33 is optimal
+  i64 n = loopIters;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
 #pragma unroll 128
@@ -209,7 +209,39 @@ double check_size(i64 logsize) {
   }
   auto end = std::chrono::high_resolution_clock::now();
   fprintf(stdin, "%p", ptr);
-  auto diff = static_cast<double>((end - start).count()) / N;
+  auto diff = static_cast<double>((end - start).count()) / (loopIters);
+  free(unalignedHeap);
+  return diff;
+}
+
+// size must be a power of 2
+double check_assoc2(i64 maybeAssoc) {
+  void** unalignedHeap = (void**)calloc(1 << 22, sizeof(void*));
+  void** heap = create_aligned_ptr(unalignedHeap);
+  i64 const step = 1 << 15;
+  for (i64 i = 0; i < maybeAssoc; ++i) {
+    i64 nextI = (i + 1) % maybeAssoc;
+    heap[step * i] = heap + step * nextI;
+  }
+  { // seeting up the memory
+    i64 n = maybeAssoc * 8;
+    auto ptr = heap;
+    while (--n) {
+      ptr = (void**)*ptr;
+    }
+    fprintf(stdin, "%p", ptr);
+  }
+  i64 repCount = 1 << 28;
+  i64 n = maybeAssoc * repCount;
+  auto ptr = heap;
+  auto start = std::chrono::high_resolution_clock::now();
+#pragma unroll 128
+  while (--n) {
+    ptr = (void**)*ptr;
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  fprintf(stdin, "%p", ptr);
+  auto diff = static_cast<double>((end - start).count()) / (maybeAssoc * repCount);
   free(unalignedHeap);
   return diff;
 }
