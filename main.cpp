@@ -40,23 +40,6 @@ i64 find_cache_line_size() {
     return -1;
 }
 
-i64 find_first_tag_index(i64 cacheline_size) {
-    auto prev = 10000000000.0;
-    for (int maybeTag = 16; maybeTag <= 24; ++maybeTag) {
-        int tagStep = 1 << maybeTag;
-        double next = check_tag_index(tagStep);
-#ifdef VERBOSE
-        std::cout << "maybeTag=" << maybeTag << " mean=" << next << std::endl;
-#endif
-        if (prev * 1.3 < next) {
-            std::cout << "assessed first tag index: " << maybeTag << std::endl;
-            return maybeTag;
-        }
-        prev = next;
-    }
-    return -1;
-}
-
 i64 find_assoc(i64 first_tag_index) {
     // this pre-search allows us to narrow down the search to [8, 16]
     // for (int maybeAssoc = 2; maybeAssoc <= 64; maybeAssoc <<= 1) {
@@ -78,10 +61,8 @@ i64 find_assoc(i64 first_tag_index) {
     return -1;
 }
 
-int main() {
-    bind_to_one_core();
-    i64 logPageSize = 12;
-    std::ofstream f("cachesize-to-time.txt");
+void size_eval_loop() {
+    // std::ofstream f("cachesize-to-time.txt");
     double prev = 10000000000.0;
     std::optional<i64> ansKb = std::nullopt;
     std::vector<i64> candidates {8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128};
@@ -91,8 +72,8 @@ int main() {
         double measureTime = check_size(sizeB);
         auto end = std::chrono::high_resolution_clock::now();
         auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
-        f << sizeKb << ',' << measureTime << std::endl;
-        printf("size=%4ldKb time=%f (took %lds)\n", sizeKb, measureTime, passedTime.count());
+        // f << sizeKb << ',' << measureTime << std::endl;
+        printf("size=%3ldKb time=%f (took %lds)\n", sizeKb, measureTime, passedTime.count());
         if (measureTime > prev) {
             double relativeIncrease = (measureTime - prev) / prev;
             if (relativeIncrease > 0.08 && !ansKb.has_value()) {
@@ -102,14 +83,34 @@ int main() {
         prev = measureTime;
     }
     if (ansKb.has_value()) {
-        printf("evaluated cache size is %ld\n", ansKb.value());
+        printf("evaluated cache size is %ldKb\n", ansKb.value());
     }
-    // for (i64 i = 8; i <= 17; i += 1) {
-        // auto start = std::chrono::high_resolution_clock::now();
-        // double measureTime = check_assoc2(i);
-        // auto end = std::chrono::high_resolution_clock::now();
-        // auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
-        // printf("assoc=%4ld time=%f (took %lds)\n", i, measureTime, passedTime.count());
-    // }
+}
+
+void associativity_eval_loop() {
+    double prev = 100000.0;
+    std::optional<i64> ansAssoc = std::nullopt;
+    for (i64 i = 2; i <= 20; i += 2) {
+        auto start = std::chrono::high_resolution_clock::now();
+        double measureTime = check_assoc2(i);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
+        printf("assoc=%2ld time=%f (took %lds)\n", i, measureTime, passedTime.count());
+        if (measureTime / prev >= 1.4 && !ansAssoc.has_value()) {
+            ansAssoc = i - 2;
+        }
+        prev = measureTime;
+    }
+    if (ansAssoc.has_value()) {
+        printf("evaluated associativity is %ld\n", ansAssoc.value());
+    } else {
+        printf("failed to evaluate associativity :(");
+    }
+}
+
+int main() {
+    bind_to_one_core();
+    size_eval_loop();
+    associativity_eval_loop();
     return 0;
 }

@@ -3,10 +3,8 @@
 #include <numeric>
 #include <vector>
 #include <unistd.h>
-
+#include <algorithm>
 #include "page_traverser.h"
-
-#include <assert.h>
 #include <source_location>
 
 #include "clear_memory.h"
@@ -181,8 +179,8 @@ T* create_aligned_ptr(T* unalignedHeap) {
 
 // size must be a power of 2
 double check_size(i64 size) {
-  assert(logsize >= 13);
-  void** unalignedHeap = (void**)calloc(1 << 22, sizeof(void*));
+  // assert(logsize >= 13);
+  void** unalignedHeap = (void**)calloc(size * 2 + 4096, sizeof(void*));
   void** heap = create_aligned_ptr(unalignedHeap);
   i64 const step = 1 << 6;
   i64 N = size / step; // >= 1 << 7
@@ -192,7 +190,7 @@ double check_size(i64 size) {
   }
   {
     // setting up memory
-    i64 n = N * 4;
+    i64 n = 1l << 26;
     auto ptr = heap;
     while (--n) {
       ptr = (void**)*ptr;
@@ -203,7 +201,7 @@ double check_size(i64 size) {
   i64 n = loopIters;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
-#pragma unroll 128
+#pragma unroll 1024
   while (--n) {
     ptr = (void**)*ptr;
   }
@@ -216,32 +214,41 @@ double check_size(i64 size) {
 
 // size must be a power of 2
 double check_assoc2(i64 maybeAssoc) {
-  void** unalignedHeap = (void**)calloc(1 << 22, sizeof(void*));
+  void** unalignedHeap = (void**)calloc(1 << 25, sizeof(void*));
   void** heap = create_aligned_ptr(unalignedHeap);
-  i64 const step = 1 << 15;
+  i64 const bigStep = 1 << 18;
+  i64 const smallStep = 1 << 6;
+  i64 smallStepBound = 4;
   for (i64 i = 0; i < maybeAssoc; ++i) {
-    i64 nextI = (i + 1) % maybeAssoc;
-    heap[step * i] = heap + step * nextI;
+    for (int j = 0; j < smallStepBound; ++j) {
+      i64 nextJ = (j + 1) % smallStepBound;
+      i64 nextI = i;
+      if (nextJ == 0) {
+        nextI = (nextI + 1) % maybeAssoc;
+      }
+      // i64 nextI = (i + 1) % maybeAssoc;
+      heap[bigStep * i + smallStep * j] = heap + bigStep * nextI + smallStep * nextJ;
+    }
   }
   { // seeting up the memory
-    i64 n = maybeAssoc * 8;
+    i64 n = 1l << 28;
     auto ptr = heap;
     while (--n) {
       ptr = (void**)*ptr;
     }
     fprintf(stdin, "%p", ptr);
   }
-  i64 repCount = 1 << 28;
-  i64 n = maybeAssoc * repCount;
+  constexpr i64 repCount = 1l << 33;
+  i64 n = repCount;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
-#pragma unroll 128
+#pragma unroll 1024
   while (--n) {
     ptr = (void**)*ptr;
   }
   auto end = std::chrono::high_resolution_clock::now();
   fprintf(stdin, "%p", ptr);
-  auto diff = static_cast<double>((end - start).count()) / (maybeAssoc * repCount);
+  auto diff = static_cast<double>((end - start).count()) / repCount;
   free(unalignedHeap);
   return diff;
 }
