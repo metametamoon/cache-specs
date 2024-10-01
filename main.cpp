@@ -21,7 +21,7 @@ void bind_to_one_core() {
 
 i64 find_cacheline_size() {
     double prev = 100.0;
-    for (int i = 1; i < 4096; i = i << 1) {
+    for (int i = 1; i <= 256; i = i << 1) {
         double next = traverse_pages(i, 4000);
 #ifdef VERBOSE
         std::cout << "step=" << i << " mean=" << next << std::endl;

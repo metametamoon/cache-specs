@@ -74,6 +74,7 @@ double traverse_pages(i64 step, i64 repNum) {
   std::ofstream of{ "step-" + std::to_string(step) + ".txt" };
   for (auto const &result : results) {
     of << result << ",";
+    std::cout << result << ",";
   }
   // std::cout << "sum= " << sum << std::endl;
   return robust_mean(results);
