@@ -5,25 +5,10 @@
 #include <unistd.h>
 #include <algorithm>
 #include "page_traverser.h"
-#include <source_location>
+#include <cassert>
 
-#include "clear_memory.h"
+#include "mem_utils.h"
 
-
-u8* zero_alloc(i64 size, const std::source_location location = std::source_location::current()) {
-  auto x = calloc(size, 1);
-  if (x == nullptr) {
-    printf("zero_alloc failed\n");
-    std::cout << "file: "
-        << location.file_name() << '('
-        << location.line() << ':'
-        << location.column() << ") `"
-        << location.function_name()
-          << " tried allocating (bytes):" << size <<  std::endl;
-    exit(-1);
-  }
-  return static_cast<u8 *>(x);
-}
 
 
 
@@ -33,10 +18,12 @@ void activate_pages(i64 pageCount, i64 pageSize, u8 *heap) {
     u8 value = heap[pageSize * i];
     sum += value;
   }
+  do_not_optimize(sum);
 }
 
-u8* create_aligned_heap(u8* unalignedHeap) {
-  u8* heap = unalignedHeap;
+template <typename T>
+T* create_aligned_ptr(T* unalignedHeap) {
+  T* heap = unalignedHeap;
   while (reinterpret_cast<unsigned long long>(heap) & 0xFFF) {
     heap += 1;
   }
@@ -56,6 +43,7 @@ double traverse_pages(i64 step, i64 repNum) {
   // The following variable represents an amount of mem access in a benchmark.
   // We don't want it to be too small so that we could assess the average mem access as a mean
   // with reasonable error.
+
   // But we also don't want it to be too big so that we could profit from kicking out
   // outliers using the robust mean calculation.
   i64 pageCount = 400;
@@ -64,126 +52,34 @@ double traverse_pages(i64 step, i64 repNum) {
   std::vector<double> results;
   u8 sum = 0;
   for (i64 rep = 0; rep < repNum; ++rep) {
-    free(clear_memory());
-    u64* heap = (u64*)calloc(alloca_size, sizeof(u8));
-    // u8* heap = create_aligned_heap(unalignedHeap);
+    free(trash_cpu_caches());
+    u8* unalignedHeap = (u8*)calloc(alloca_size, 1);
+    u8* heap = create_aligned_ptr(unalignedHeap);
 
-    free(clear_memory());
-    //activate_pages(pageCount, pageSize, heap);
+    free(trash_cpu_caches());
+    activate_pages(pageCount, pageSize, heap);
 
-    /*
-     * If step is greater than the size of the cache line, each (a simplification) iteration of the loop
-     * will result in a cache miss, degrading the performance. The experiments showed that the performance
-     * is being halved in such cases.
-     */
-
-    for (i64 i = 0; i < pageCount - 1; i++) {
-      heap[pageSize * i + step] = reinterpret_cast<u64>(heap + pageSize * (i + 1) + step);
-    }
-    auto ptr = heap + step;
-    free(clear_memory());
-    std::cout << "step=" << step << std::endl;
     auto const start = std::chrono::high_resolution_clock::now();
     for (i64 i = 0; i < pageCount; i++) {
-      ptr = reinterpret_cast<u64 *>(*ptr);
-      std::cout << "i = " << i << " " << ptr - heap << std::endl;
+      u8 value = heap[pageSize * i + step];
+      sum += value;
     }
     auto const end = std::chrono::high_resolution_clock::now();
-    if (reinterpret_cast<u64>(ptr) != 0) {
-      std::cout << "Here!\n";
-    }
-
+    do_not_optimize(sum);
     auto mean = static_cast<double>((end - start).count()) / pageCount;
     results.push_back(mean);
-    free(heap);
+    free(unalignedHeap);
   }
   // std::cout << "sum= " << sum << std::endl;
   return robust_mean(results);
 }
 
-/*
- * The idea is as follows:
- * we are going reading-writing at address `heap + tag_try * i` for i in [0..1024).
- * If `tag_try` is an index that points to an index field of the address,
- * we will hit a new cache set most of the times, thus, the need to write-back during
- * the overflow of cache will be escaped.
- * If, however, `tag_try` is actually an index pointing into the tag section of the address,
- * at each iteration we will try to access new cache line with trying to put it into the same cache set,
- * thus causing the writeback to some cache line from the cache set, causing additional overhead.
- * The experiments show that this overhead causes the resulting time of the operation to be at least twice
- * as large as the cost without the overhead.
- */
-double check_tag_index(i64 tag_try) {
-  auto unalignedHeap = zero_alloc(tag_try * 1024 + 4096);
-  auto heap = create_aligned_heap(unalignedHeap);
-  free(clear_memory());;
-  int nTries = 500000;
-  std::vector<double> results;
 
-  free(clear_memory());;
-  for (i64 nTry = 0; nTry < nTries; nTry++) {
-    auto start = std::chrono::high_resolution_clock::now();
-    for (i64 i = 0; i < 1024; i++) {
-      i64 baseIndex = 0;
-      heap[baseIndex + tag_try * i] = heap[baseIndex + tag_try * i] + 1;
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto diff = static_cast<double>((end - start).count());
-    results.push_back(diff);
-  }
-  free(unalignedHeap);
-  return robust_mean(results);
-}
-
-/*
- *  We will to access addresses `heap + i * (1 << first_tag_index)` for i in [0..assoc_try) in the loop.
- *  When `assoc_try > real_assoc`, we are hitting the same cache set in the loop more times than there are
- *  entries in a cache set, thus causing the writeback to negatively impact the performance
- */
-double check_assoc(i64 assoc_try, i64 first_tag_index) {
-  auto unalignedHeap = zero_alloc(64 * (1 << 21) + 4096);
-  auto heap = create_aligned_heap(unalignedHeap);
-  free(clear_memory());
-  int nTries = 1000000;
-  std::vector<double> results;
-
-  free(clear_memory());
-  int tag = 1 << first_tag_index;
-
-  int portion = 4096 / assoc_try;
-  for (i64 nTry = 0; nTry < nTries; nTry++) {
-    auto start = std::chrono::high_resolution_clock::now();
-    for (i64 p = 0; p < portion; p++) {
-      for (i64 i = 0; i < assoc_try; i++) {
-        i64 baseIndex = 0;
-        heap[baseIndex + tag * i] = heap[baseIndex + tag * i] + 1;
-      }
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto diff = static_cast<double>((end - start).count());
-    results.push_back(diff);
-  }
-  free(unalignedHeap);
-  return robust_mean(results);
-}
-
-template <typename T>
-T* create_aligned_ptr(T* unalignedHeap) {
-  T* heap = unalignedHeap;
-  while (reinterpret_cast<unsigned long long>(heap) & 0xFFF) {
-    heap += 1;
-  }
-  return heap;
-}
-
-
-// size must be a power of 2
-double check_size(i64 size) {
-  // assert(logsize >= 13);
+double check_size(i64 size, i64 cacheline_size) {
   void** unalignedHeap = (void**)calloc(size * 2 + 4096, sizeof(void*));
   void** heap = create_aligned_ptr(unalignedHeap);
-  i64 const step = 1 << 6;
-  i64 N = size / step; // >= 1 << 7
+  i64 const step = cacheline_size;
+  i64 N = size / step;
   for (i64 i = 0; i < N; ++i) {
     i64 nextI = (i + 1) % N;
     heap[step * i] = heap + step * nextI;
@@ -195,9 +91,9 @@ double check_size(i64 size) {
     while (--n) {
       ptr = (void**)*ptr;
     }
-    fprintf(stdin, "%p", ptr);
+    do_not_optimize_ptr(ptr);
   }
-  i64 const loopIters = 1l << 33; // 33 is optimal
+  i64 const loopIters = 1l << 31; // 33 is optimal
   i64 n = loopIters;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
@@ -206,18 +102,18 @@ double check_size(i64 size) {
     ptr = (void**)*ptr;
   }
   auto end = std::chrono::high_resolution_clock::now();
-  fprintf(stdin, "%p", ptr);
+  do_not_optimize_ptr(ptr);
   auto diff = static_cast<double>((end - start).count()) / (loopIters);
   free(unalignedHeap);
   return diff;
 }
 
 // size must be a power of 2
-double check_assoc2(i64 maybeAssoc) {
+double check_assoc(i64 maybeAssoc, i64 cacheline_size) {
   void** unalignedHeap = (void**)calloc(1 << 25, sizeof(void*));
   void** heap = create_aligned_ptr(unalignedHeap);
-  i64 const bigStep = 1 << 18;
-  i64 const smallStep = 1 << 6;
+  i64 const bigStep = 1 << 18; // definitely bigger than 2^(index + offset)
+  i64 const smallStep = cacheline_size;
   i64 smallStepBound = 4;
   for (i64 i = 0; i < maybeAssoc; ++i) {
     for (int j = 0; j < smallStepBound; ++j) {
@@ -236,9 +132,9 @@ double check_assoc2(i64 maybeAssoc) {
     while (--n) {
       ptr = (void**)*ptr;
     }
-    fprintf(stdin, "%p", ptr);
+    do_not_optimize_ptr(ptr);
   }
-  constexpr i64 repCount = 1l << 33;
+  constexpr i64 repCount = 1l << 31;
   i64 n = repCount;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();
@@ -247,7 +143,7 @@ double check_assoc2(i64 maybeAssoc) {
     ptr = (void**)*ptr;
   }
   auto end = std::chrono::high_resolution_clock::now();
-  fprintf(stdin, "%p", ptr);
+  do_not_optimize_ptr(ptr);
   auto diff = static_cast<double>((end - start).count()) / repCount;
   free(unalignedHeap);
   return diff;

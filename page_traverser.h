@@ -13,7 +13,9 @@ double traverse_pages(i64 step, i64 repNum);
 double traverse_large_memory(i64 step, i64 repNum);
 double check_tag_index(i64 tag_try);
 double check_assoc(i64 assoc_try, i64 first_tag_index);
-double check_size(i64 logsize);
-double check_assoc2(i64 maybeAssoc);
+double check_size(i64 logsize, i64 cacheline_size);
+double check_assoc(i64 maybeAssoc, i64 cacheline_size);
+double check_cacheline(i64 maybeCacheline);
+double check_cacheline2(i64 maybeCacheline);
 
 #endif //PAGE_TRAVERSER_H
