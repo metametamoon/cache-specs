@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "page_traverser.h"
 #include <cassert>
+#include <fstream>
 
 #include "mem_utils.h"
 
@@ -31,9 +32,9 @@ T* create_aligned_ptr(T* unalignedHeap) {
 }
 
 double robust_mean(std::vector<double> means) {
-  assert(means.size() >= 15);
+  assert(means.size() >= 25);
   i64 n = means.size();
-  i64 cutoff = n / 5;
+  i64 cutoff = 10;
   std::sort(means.begin(), means.end());
   auto sum = std::accumulate(means.begin() + cutoff, means.end() - cutoff, 0.0);
   return sum / (std::ssize(means)  - 2 * cutoff);
@@ -69,6 +70,10 @@ double traverse_pages(i64 step, i64 repNum) {
     auto mean = static_cast<double>((end - start).count()) / pageCount;
     results.push_back(mean);
     free(unalignedHeap);
+  }
+  std::ofstream of{ "step-" + std::to_string(step) + ".txt" };
+  for (auto const &result : results) {
+    of << result << ",";
   }
   // std::cout << "sum= " << sum << std::endl;
   return robust_mean(results);

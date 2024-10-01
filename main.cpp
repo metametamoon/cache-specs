@@ -22,16 +22,17 @@ void bind_to_one_core() {
 i64 find_cacheline_size() {
     double prev = 100.0;
     for (int i = 1; i < 4096; i = i << 1) {
-        double next = traverse_pages(i, 1000);
+        double next = traverse_pages(i, 4000);
 #ifdef VERBOSE
         std::cout << "step=" << i << " mean=" << next << std::endl;
 #endif
         if (next > prev * 1.75) {
             std::cout << "assessed cache line size: " << i << std::endl;
-            return i;
+            // return i;
         }
         prev = next;
     }
+    printf("failed to find cacheline size\n");
     return -1;
 }
 
@@ -85,9 +86,11 @@ void associativity_eval_loop(i64 cacheline_size) {
 int main() {
     bind_to_one_core();
     auto cacheline_size = find_cacheline_size();
-    if (cacheline_size != -1) {
-        size_eval_loop(cacheline_size);
-        associativity_eval_loop(cacheline_size);
+    if (cacheline_size == -1 ) {
+        cacheline_size = 64;
+        printf("continuing assuming cache line size is 64");
     }
+    // size_eval_loop(cacheline_size);
+    // associativity_eval_loop(cacheline_size);
     return 0;
 }
