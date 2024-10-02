@@ -99,7 +99,7 @@ double check_size(i64 size, i64 cacheline_size) {
     }
     do_not_optimize_ptr(ptr);
   }
-  i64 const loopIters = 1l << 31; // 33 is optimal
+  i64 const loopIters = 1l << 33; // 33 is optimal
   i64 n = loopIters;
   auto ptr = heap;
   auto start = std::chrono::high_resolution_clock::now();

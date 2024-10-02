@@ -27,7 +27,7 @@ i64 cacheline_eval_loop() {
         double measureTime = check_cacheline2(i / (sizeof(void**)));
         auto end = std::chrono::high_resolution_clock::now();
         auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
-        printf("cacheline=%3ldKb time=%f (took %lds)\n", i, measureTime, passedTime.count());
+        printf("cacheline=%3ld time=%f (took %lds)\n", i, measureTime, passedTime.count());
         if (measureTime > prev) {
             double relativeIncrease = (measureTime - prev) / prev;
             if (relativeIncrease > 0.08 && !ansCacheline.has_value()) {
@@ -37,7 +37,7 @@ i64 cacheline_eval_loop() {
         prev = measureTime;
     }
     if (ansCacheline.has_value()) {
-        printf("evaluated cache size is %ldKb\n", ansCacheline.value());
+        printf("evaluated cache line size is %ld\n", ansCacheline.value());
         return ansCacheline.value();
     } else {
         printf("failed to find cacheline size\n");
@@ -56,11 +56,10 @@ void size_eval_loop(i64 cacheline_size) {
         double measureTime = check_size(sizeB, cacheline_size);
         auto end = std::chrono::high_resolution_clock::now();
         auto passedTime = std::chrono::duration_cast<std::chrono::seconds>((end - start));
-        // f << sizeKb << ',' << measureTime << std::endl;
         printf("size=%3ldKb time=%f (took %lds)\n", sizeKb, measureTime, passedTime.count());
         if (measureTime > prev) {
             double relativeIncrease = (measureTime - prev) / prev;
-            if (relativeIncrease > 0.08 && !ansKb.has_value()) {
+            if (relativeIncrease > 0.07 && !ansKb.has_value()) {
                 ansKb = sizeKb / 2;
             }
         }
@@ -99,7 +98,7 @@ int main() {
         cacheline_size = 64;
         printf("continuing assuming cache line size is 64");
     }
-    // size_eval_loop(cacheline_size);
-    // associativity_eval_loop(cacheline_size);
+    size_eval_loop(cacheline_size);
+    associativity_eval_loop(cacheline_size);
     return 0;
 }
